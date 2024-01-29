@@ -11,15 +11,75 @@ concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: true
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
   contents: write
   pages: write
   id-token: write
 
 jobs:
+  cypress-run:
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        containers: [1, 2, 3, 4, 5]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download the build folder
+        uses: actions/download-artifact@v3
+        with:
+          name: build
+
+      - name: Cypress run
+        uses: cypress-io/github-action@v6
+        with:
+          record: true
+          parallel: true
+          group: 'UI-Chrome'
+          start: npm start
+
   hello:
     name: Echo Hello World
     runs-on: ubuntu-latest
     steps:
-      - run: echo Hello World
+        - name: Checkout Repository
+          uses: actions/checkout@v2
+    
+        - name: Set up Node.js
+          uses: actions/setup-node@v3
+          with:
+            node-version: 14 
+    
+        - name: Install Dependencies
+          run: npm install  
+    
+        - name: Lint and Format
+          run: |
+            npm run lint
+            npm run format
+    
+        - name: Check for Changes
+          id: check_changes
+          run: |
+            git diff --exit-code || echo "Changes found"
+    
+        - name: Commit Changes
+          if: steps.check_changes.outputs.result == 'Changes found'
+          run: |
+            git config user.name "${{ github.actor }}"
+            git config user.email "${{ github.actor }}@users.noreply.github.com"
+            git add .
+            git commit -m "Lint and format changes" || echo "No changes to commit"
+    
+        - name: Push Changes
+          if: steps.check_changes.outputs.result == 'Changes found'
+          uses: ad-m/github-push-action@master
+          with:
+            github_token: ${{ secrets.GITHUB_TOKEN }}
+            name: Cypress Tests
+
+            on: push
+            
+            
